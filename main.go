@@ -24,22 +24,6 @@ import (
 	"strings"
 )
 
-// Expects something like this:
-// $ traceroute 162.144.216.152
-// traceroute to 162.144.216.152 (162.144.216.152), 64 hops max, 52 byte packets
-// 1  100.76.175.252 (100.76.175.252)  2.504 ms  2.090 ms  1.607 ms
-// 2  us-sfo-spe-bb1-xe-4-2-0-0.n.corp.google.com (172.31.151.10)  1.475 ms  1.854 ms  1.870 ms
-// 3  us-sfo-spe-fw1-reth0-503.n.corp.google.com (172.31.151.177)  2.428 ms  2.255 ms  2.114 ms
-// 4  104.132.11.193 (104.132.11.193)  2.369 ms  2.415 ms  2.137 ms
-// 5  pr01-xe-4-2-1-511.pao03.net.google.com (72.14.210.179)  10.286 ms  3.437 ms  3.325 ms
-// 6  pr02-ae2.sjc07.net.google.com (108.170.242.231)  4.359 ms
-// pr02-ae6.sjc07.net.google.com (108.170.243.7)  4.735 ms  5.891 ms
-// 7  te2-0-0d0.cir1.sanjose2-ca.us.xo.net (216.156.84.29)  5.824 ms  4.533 ms  4.543 ms
-// 8  216.156.16.194.ptr.us.xo.net (216.156.16.194)  21.200 ms  21.806 ms  21.348 ms
-// 9  207.88.12.150.ptr.us.xo.net (207.88.12.150)  21.335 ms  22.661 ms  22.585 ms
-// 10  207.88.12.159.ptr.us.xo.net (207.88.12.159)  21.850 ms  21.555 ms  21.211 ms
-// 11  te-4-1-0.rar3.miami-fl.us.xo.net (207.88.12.161)  21.259 ms  22.038 ms  22.972 ms
-// 12  216.156.16.29.ptr.us.xo.net (216.156.16.29)  25.705 ms  36.554 ms  22.068 ms
 var ipRegex = regexp.MustCompile(`\([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\)`)
 
 func main() {
