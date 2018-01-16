@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -32,12 +31,17 @@ var ipRegex = regexp.MustCompile(`\([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,
 
 func main() {
 	if len(os.Args) <= 1 {
-		log.Fatal("Please provide a destination IP")
+		panic("Please provide a destination IP")
 	}
 
 	dest := os.Args[1]
 	if dest == "" {
-		log.Fatal("Please provide a destination IP")
+		panic("Please provide a destination IP")
+	}
+
+	mapsApiKey := os.Getenv("GOOGLE_MAPS_API_KEY")
+	if mapsApiKey == "" {
+		panic("Missing GOOGLE_MAPS_API_KEY environment variable. Snag one at https://developers.google.com/maps/documentation/javascript/get-api-key")
 	}
 
 	ips := traceRoute(dest)
@@ -45,11 +49,17 @@ func main() {
 
 	geos := []geo{}
 	for _, ip := range ips {
-		geos = append(geos, getGeoForIp(ip))
+		ipGeo := getGeoForIp(ip)
+		if ipGeo.Lat == 0 && ipGeo.Lng == 0 {
+			continue // throw out the 0,0s
+		}
+
+		geos = append(geos, ipGeo)
 	}
 
-	fmt.Println(ips)
-	fmt.Println(geos)
+	htmlFilePath := createHtml(formatGeos(geos), mapsApiKey)
+
+	openFileInBrowser(htmlFilePath)
 }
 
 func traceRoute(destinationIp string) []string {
@@ -59,7 +69,7 @@ func traceRoute(destinationIp string) []string {
 	args := []string{destinationIp}
 	out, err := exec.Command(cmd, args...).Output()
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	return extractIps(string(out))
@@ -83,7 +93,7 @@ type geo struct {
 func getGeoForIp(ip string) geo {
 	resp, err := http.Get(fmt.Sprintf("http://ip-api.com/json/%s", ip))
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
@@ -98,4 +108,38 @@ func getGeoForIp(ip string) geo {
 	}
 
 	return r
+}
+
+func formatGeos(geos []geo) (s string) {
+	for _, g := range geos {
+		s += fmt.Sprintf(`{lat: %v, lng: %v},`, g.Lat, g.Lng)
+	}
+
+	return s[:len(s)-1]
+}
+
+func createHtml(geos, mapsApiKey string) string {
+	f, err := ioutil.TempFile("", "maproute")
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		err := f.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	fileContents := template
+	fileContents = strings.Replace(fileContents, "API_KEY_HERE", mapsApiKey, -1)
+	fileContents = strings.Replace(fileContents, "GEOS_HERE", geos, -1)
+
+	f.Write([]byte(fileContents))
+
+	err = os.Rename(f.Name(), f.Name() + ".html")
+	if err != nil {
+		panic(err)
+	}
+
+	return f.Name() + ".html"
 }
