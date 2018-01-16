@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 )
@@ -51,28 +50,20 @@ func main() {
 	for _, ip := range ips {
 		ipGeo := getGeoForIp(ip)
 		if ipGeo.Lat == 0 && ipGeo.Lng == 0 {
+			fmt.Printf("Throwing out ip %s because its coords resolve to (0,0)\n", ip)
 			continue // throw out the 0,0s
 		}
 
 		geos = append(geos, ipGeo)
 	}
 
+	if len(geos) == 0 {
+		panic(fmt.Sprintf("Didn't get any location data on those IPs (%s) - try a different destination IP!", ips))
+	}
+
 	htmlFilePath := createHtml(formatGeos(geos), mapsApiKey)
 
 	openFileInBrowser(htmlFilePath)
-}
-
-func traceRoute(destinationIp string) []string {
-	fmt.Println("Tracing")
-
-	cmd := "traceroute"
-	args := []string{destinationIp}
-	out, err := exec.Command(cmd, args...).Output()
-	if err != nil {
-		panic(err)
-	}
-
-	return extractIps(string(out))
 }
 
 func extractIps(traceRouteOut string) []string {
@@ -136,7 +127,7 @@ func createHtml(geos, mapsApiKey string) string {
 
 	f.Write([]byte(fileContents))
 
-	err = os.Rename(f.Name(), f.Name() + ".html")
+	err = os.Rename(f.Name(), f.Name()+".html")
 	if err != nil {
 		panic(err)
 	}
