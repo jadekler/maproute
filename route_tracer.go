@@ -15,21 +15,32 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
-	"os"
 	"os/exec"
+	"strings"
+	"time"
 )
 
-func traceRoute(destinationIp string) []string {
+func traceRoute(destinationIp string) []geo {
 	fmt.Println("Tracing")
 
-	stdoutInterceptor := interceptor{output: []byte{}}
+	waitForReadingToFinish := make(chan struct{})
+	buf := bytes.Buffer{}
+	stdoutInterceptor := interceptor{
+		buf:          &buf,
+		geos:         []geo{},
+		noMoreOutput: false,
+		done:         waitForReadingToFinish,
+	}
 	stderrInterceptor := bytes.Buffer{}
 
 	cmd := exec.Command("traceroute", destinationIp)
 	cmd.Stdout = &stdoutInterceptor
 	cmd.Stderr = &stderrInterceptor
+
+	go stdoutInterceptor.getIps()
 
 	err := cmd.Run()
 	if err != nil {
@@ -37,17 +48,64 @@ func traceRoute(destinationIp string) []string {
 		panic(err)
 	}
 
-	ips := extractIps(string(stdoutInterceptor.output))
+	stdoutInterceptor.noMoreOutput = true
+	<-waitForReadingToFinish
 
-	return ips
+	return stdoutInterceptor.geos
 }
 
 type interceptor struct {
-	output []byte
+	buf          *bytes.Buffer
+	geos         []geo
+	noMoreOutput bool
+	done         chan (struct{})
 }
 
 func (i *interceptor) Write(p []byte) (n int, err error) {
-	i.output = append(i.output, p...)
+	i.buf.Write(p)
+	return len(p), nil
+}
 
-	return os.Stdout.Write(p)
+func (i *interceptor) getIps() {
+	r := bufio.NewReader(i.buf)
+
+	for {
+		l, _, err := r.ReadLine()
+		if err != nil {
+			if err.Error() == "EOF" {
+				if i.noMoreOutput {
+					i.done <- struct{}{}
+					return
+				}
+
+				time.Sleep(time.Second)
+				continue
+			}
+
+			panic(err)
+		}
+
+		line := string(l)
+		ips := extractIps(line)
+
+		if len(ips) == 0 {
+			fmt.Println("* * *")
+		} else {
+			ip := ips[0]
+			geo := getGeoForIp(ip)
+			fmt.Printf("%s %s, %s (%v, %v)\n", ip, geo.City, geo.Country, geo.Lat, geo.Lng)
+
+			i.geos = append(i.geos, geo)
+		}
+	}
+}
+
+func extractIps(traceRouteOut string) []string {
+	res := ipRegex.FindAllString(traceRouteOut, -1)
+	for i, _ := range res {
+		res[i] = strings.Replace(res[i], "(", "", -1) // hack because i don't feel like figuring out regex heh
+		res[i] = strings.Replace(res[i], ")", "", -1)
+	}
+
+	return res
 }

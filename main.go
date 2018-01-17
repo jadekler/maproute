@@ -15,10 +15,7 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -41,70 +38,22 @@ func main() {
 		panic("Missing GOOGLE_MAPS_API_KEY environment variable. Snag one at https://developers.google.com/maps/documentation/javascript/get-api-key")
 	}
 
-	ips := traceRoute(dest)
-	fmt.Println("Getting geos")
+	geos := traceRoute(dest)
 
-	geos := []geo{}
-	for _, ip := range ips {
-		ipGeo := getGeoForIp(ip)
-		if ipGeo.Lat == 0 && ipGeo.Lng == 0 {
-			fmt.Printf("Throwing out ip %s because its coords resolve to (0,0)\n", ip)
-			continue // throw out the 0,0s
-		}
-
-		geos = append(geos, ipGeo)
-	}
-
-	if len(geos) == 0 {
-		panic(fmt.Sprintf("Didn't get any location data on those IPs (%s) - try a different destination IP!", ips))
-	}
-
-	htmlFilePath := createHtml(formatGeos(geos), mapsApiKey)
-
-	openFileInBrowser(htmlFilePath)
-}
-
-func extractIps(traceRouteOut string) []string {
-	res := ipRegex.FindAllString(traceRouteOut, -1)
-	for i, _ := range res {
-		res[i] = strings.Replace(res[i], "(", "", -1) // hack because i don't feel like figuring out regex heh
-		res[i] = strings.Replace(res[i], ")", "", -1)
-	}
-
-	return res
-}
-
-type geo struct {
-	Lat float64 `json:"lat"`
-	Lng float64 `json:"lon"`
-}
-
-func getGeoForIp(ip string) geo {
-	resp, err := http.Get(fmt.Sprintf("http://ip-api.com/json/%s", ip))
-	if err != nil {
-		panic(err)
-	}
-
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	var r geo
-	err = json.Unmarshal(bodyBytes, &r)
-	if err != nil {
-		panic(err)
-	}
-
-	return r
-}
-
-func formatGeos(geos []geo) (s string) {
+	filteredGeos := []geo{}
 	for _, g := range geos {
-		s += fmt.Sprintf(`{lat: %v, lng: %v},`, g.Lat, g.Lng)
+		if g.Lat == 0 && g.Lng == 0 {
+			continue
+		}
+		filteredGeos = append(filteredGeos, g)
 	}
 
-	return s[:len(s)-1]
+	if len(filteredGeos) == 0 {
+		panic("Didn't get any location data on those IPs - try a different destination IP!")
+	}
+
+	htmlFilePath := createHtml(formatGeos(filteredGeos), mapsApiKey)
+	openFileInBrowser(htmlFilePath)
 }
 
 func createHtml(geos, mapsApiKey string) string {
