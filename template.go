@@ -20,7 +20,7 @@ const template = `
 <head>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
-    <title>Simple Polylines</title>
+    <title>maproute</title>
     <style>
         #map {
             height: 100%;
@@ -40,7 +40,7 @@ const template = `
     function initMap() {
         var map = new google.maps.Map(document.getElementById('map'), {
             zoom: 3,
-            center: {lat: 0, lng: -180},
+            center: {lat: 0, lng: -130},
             mapTypeId: 'terrain'
         });
 
@@ -49,7 +49,7 @@ const template = `
         ];
         var flightPath = new google.maps.Polyline({
             path: flightPlanCoordinates,
-            geodesic: false,
+            geodesic: true,
             strokeColor: '#FF0000',
             strokeOpacity: 1.0,
             strokeWeight: 2
